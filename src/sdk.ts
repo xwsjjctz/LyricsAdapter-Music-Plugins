@@ -1,0 +1,211 @@
+import type { QQCredential } from './qq/credential';
+export type OnlineQuality = '128' | '320' | 'flac' | 'm4a';
+
+/**
+ * A song returned by an online source. Field names mirror the original
+ * QQ Music shape (kept stable) so existing UI rows work unchanged.
+ */
+export interface OnlineSong {
+  /** Unique id — QQ `songmid` or NetEase numeric id (as string). */
+  songmid: string;
+  songname: string;
+  singer: { name: string; mid?: string | undefined }[];
+  albumname?: string | undefined;
+  albummid?: string | undefined;
+  /** Duration in seconds. */
+  interval?: number | undefined;
+  coverUrl?: string | undefined;
+  coverUrlFullSize?: string | undefined;
+  /** QQ media file id; can differ from songmid and names the audio file to request. */
+  mediaMid?: string | undefined;
+}
+
+export interface OnlineUrlResult {
+  url: string;
+  bitrate: string;
+  /** The quality actually served, which can be lower than requested. */
+  quality: OnlineQuality;
+}
+
+/** A provider lyric response with an LRC fallback and optional karaoke payload. */
+export interface OnlineLyricsResult {
+  /** Plain or line-synchronised lyric text for metadata embedding and fallback UI. */
+  lyrics: string;
+  /** Provider-native character/word-timed lyric text. */
+  wordLyrics?: string | undefined;
+  wordLyricsFormat?: 'qrc' | 'yrc' | undefined;
+}
+
+export type OnlineSource = 'qq' | 'netease';
+
+export interface PlaylistInfo {
+  id: string;
+  name: string;
+  coverUrl: string;
+  songCount: number;
+  source: OnlineSource;
+}
+
+export interface OnlineMusicProvider {
+  readonly id: OnlineSource;
+  searchMusic(query: string, limit?: number): Promise<OnlineSong[]>;
+  getRecommendedSongs(): Promise<OnlineSong[]>;
+  /** Optional batch metadata hydration for sources whose search result is sparse. */
+  getSongDetails?(songmids: string[]): Promise<OnlineSong[]>;
+  getMusicUrl(songmid: string, quality: OnlineQuality, mediaMid?: string): Promise<OnlineUrlResult>;
+  getLyrics(songmid: string): Promise<OnlineLyricsResult | null>;
+  /** Full-size cover URL for the song (used when embedding metadata). */
+  getCoverUrl(song: OnlineSong): string;
+  /** Login cookie for this source (empty when not set / anonymous). */
+  getRawCookie(): string;
+  hasCookie(): boolean;
+  /** Whether features are gated behind a login cookie (QQ: yes, NetEase: no). */
+  requiresCookie(): boolean;
+  /** Fetch the user's playlists (or popular playlists when not logged in). */
+  getPlaylists(): Promise<PlaylistInfo[]>;
+  /** Fetch songs in a specific playlist. */
+  getPlaylistSongs(playlistId: string, offset?: number, limit?: number): Promise<OnlineSong[]>;
+}
+
+export interface OnlineMusicElectronAPI {
+  getQQMusicUrl?: (reqData: Record<string, unknown>, cookie: string) => Promise<unknown>;
+  qqMusicRequest?: (options: {
+    url: string;
+    method?: 'GET' | 'POST';
+    headers?: Record<string, string>;
+    body?: string;
+    cookie?: string;
+  }) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  getQQMusicLyrics?: (
+    songmid: string,
+    cookie: string
+  ) => Promise<{
+    success: boolean;
+    lyrics?: string;
+    wordLyrics?: string;
+    wordLyricsFormat?: 'qrc';
+    error?: string;
+  }>;
+  /** Generic NetEase weapi request (encryption handled in main process). */
+  neteaseRequest?: (
+    channel: string,
+    params: Record<string, unknown>,
+    cookie?: string
+  ) => Promise<{ success: boolean; data?: unknown; error?: string }>;
+  /** QQ Music QR login — start a session, returns a PNG data URL + session token. */
+  qqLoginQrStart?: () => Promise<{
+    success: boolean;
+    token?: string;
+    qrcode?: string;
+    expiresIn?: number;
+    error?: string;
+  }>;
+  /** QQ Music QR login — poll a session until done/expired. */
+  qqLoginQrPoll?: (
+    token: string
+  ) => Promise<{
+    success: boolean;
+    status?: 'waiting' | 'confirming' | 'done' | 'expired' | 'error';
+    msg?: string;
+    cookie?: string;
+    credential?: QQCredential;
+    error?: string;
+  }>;
+  /** QQ Music — exchange the stored refresh key/token for a fresh musickey. */
+  qqLoginRefresh?: (
+    credential: QQCredential,
+    cookie: string
+  ) => Promise<{
+    success: boolean;
+    credential?: QQCredential;
+    cookie?: string;
+    error?: string;
+  }>;
+  /** NetEase QR login — request a one-time unikey. */
+  neteaseQrKey?: () => Promise<{ success: boolean; unikey?: string; error?: string }>;
+  /** NetEase QR login — render the QR for a key as a PNG data URL. */
+  neteaseQrCreate?: (key: string) => Promise<{ success: boolean; qrcode?: string; error?: string }>;
+  /** NetEase QR login — poll a key. code 800=expired 801=waiting 802=confirming 803=success. */
+  neteaseQrCheck?: (
+    key: string
+  ) => Promise<{
+    success: boolean;
+    code?: number;
+    message?: string;
+    cookie?: string;
+    error?: string;
+  }>;
+  /** Push a QQ / NetEase cookie to main-process memory for the streaming proxy. */
+  setOnlineCookie?: (source: string, cookie: string) => Promise<void>;
+  downloadAudioFile?: (
+    url: string,
+    cookie: string
+  ) => Promise<{ success: boolean; data?: number[] | ArrayBuffer; error?: string }>;
+  downloadAndSave?: (
+    url: string,
+    cookie: string,
+    filePath: string,
+    requestId?: string
+  ) => Promise<{ success: boolean; filePath?: string; size?: number; error?: string }>;
+  saveFileToPath?: (
+    dirPath: string,
+    fileName: string,
+    fileData: ArrayBuffer
+  ) => Promise<{ success: boolean; filePath?: string; error?: string }>;
+  writeAudioMetadata?: (
+    filePath: string,
+    metadata: {
+      title?: string;
+      artist?: string;
+      album?: string;
+      lyrics?: string;
+      coverUrl?: string;
+    }
+  ) => Promise<{ success: boolean; error?: string }>;
+  onDownloadProgress?: (
+    callback: (progress: DownloadProgressEvent) => void
+  ) => void;
+  offDownloadProgress?: (
+    callback: (progress: DownloadProgressEvent) => void
+  ) => void;
+  fetchCoverBase64?: (
+    coverUrl: string
+  ) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
+}
+
+export interface DownloadProgressEvent {
+  requestId?: string | undefined;
+  downloaded: number;
+  total: number;
+  progress: number;
+}
+
+export interface PluginLogger {
+  debug(...args: unknown[]): void;
+  info(...args: unknown[]): void;
+  warn(...args: unknown[]): void;
+  error(...args: unknown[]): void;
+}
+export interface ProviderContext {
+  logger: PluginLogger;
+  cookie: {
+    getCookie(): string;
+    hasCookie(): boolean;
+    parseCookie(): Record<string, string>;
+    ensureLoaded(): Promise<void>;
+  };
+  refresh(): Promise<boolean>;
+  bridge: OnlineMusicElectronAPI;
+  lyricsCache: { getOrLoad(source: OnlineSource, id: string, load: () => Promise<OnlineLyricsResult | null>): Promise<OnlineLyricsResult | null> };
+}
+export interface PluginHost {
+  logger: PluginLogger;
+  readSecret(name: string): string;
+  writeSecrets(entries: Record<string, string>): void;
+}
+export interface MusicPlugin {
+  provider: OnlineMusicProvider;
+  validateCookie(cookie: string): Promise<{ valid: boolean; message?: string }>;
+  invoke(action: string, args: unknown[]): Promise<unknown>;
+  streamHeaders(cookie: string): Record<string, string>;
+}
