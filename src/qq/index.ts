@@ -13,27 +13,34 @@ export function createPlugin(host: PluginHost): MusicPlugin {
     getQQMusicUrl: (data, cookie) => invoke('get-qq-music-url', [data, cookie]),
     getQQMusicLyrics: (id, cookie) => invoke('get-qq-music-lyrics', [id, cookie]) as ReturnType<NonNullable<OnlineMusicElectronAPI['getQQMusicLyrics']>>,
   };
-  let refreshing: Promise<boolean> | null = null;
+  type RefreshResponse = { success: boolean; credential?: unknown; cookie?: string; error?: string };
+  // Every refresh, whether scheduled by the host or triggered by an expired request,
+  // shares one upstream exchange so a rotating refresh token is never spent twice at once.
+  let exchanging: Promise<RefreshResponse> | null = null;
+  const exchange = (credential: unknown, cookie: unknown): Promise<RefreshResponse> => {
+    exchanging ??= (invoke('qq-login-refresh', [credential, cookie]) as Promise<RefreshResponse>).then(result => {
+      if (result.success && result.credential && result.cookie) {
+        host.writeSecrets({ credential: JSON.stringify(result.credential), cookie: result.cookie });
+      }
+      return result;
+    }).finally(() => { exchanging = null; });
+    return exchanging;
+  };
   let lastAttempt = 0;
-  const refresh = (): Promise<boolean> => {
-    if (refreshing) return refreshing;
-    if (Date.now() - lastAttempt < 10 * 60_000) return Promise.resolve(false);
+  const refresh = async (): Promise<boolean> => {
+    if (!exchanging && Date.now() - lastAttempt < 10 * 60_000) return false;
     lastAttempt = Date.now();
-    refreshing = (async () => {
+    try {
       const raw = host.readSecret('credential');
       if (!raw) return false;
       const credential: unknown = JSON.parse(raw);
       if (!isQQCredential(credential)) return false;
-      const result = await invoke('qq-login-refresh', [credential, host.readSecret('cookie')]) as {
-        success: boolean; credential?: unknown; cookie?: string;
-      };
-      if (!result.success || !result.credential || !result.cookie) return false;
-      host.writeSecrets({ credential: JSON.stringify(result.credential), cookie: result.cookie });
-      return true;
-    })().catch(error => { host.logger.warn('[QQ] Refresh failed', error); return false; }).finally(() => { refreshing = null; });
-    return refreshing;
+      const result = await exchange(credential, host.readSecret('cookie'));
+      return Boolean(result.success && result.credential && result.cookie);
+    } catch (error) { host.logger.warn('[QQ] Refresh failed', error); return false; }
   };
-  return { provider: new QQMusicAPI(createContext(host, bridge, refresh)), invoke, streamHeaders: qqMusicHeaders,
+  return { provider: new QQMusicAPI(createContext(host, bridge, refresh)), streamHeaders: qqMusicHeaders,
+    invoke: (action, args) => action === 'qq-login-refresh' ? exchange(args[0], args[1]) : invoke(action, args),
     validateCookie: async cookie => {
       const result = await bridge.qqMusicRequest!({ url: 'https://u.y.qq.com/cgi-bin/musicu.fcg', method: 'POST', cookie,
         body: JSON.stringify({ comm: { ct: 24, cv: 4747474, format: 'json', uin: '0', g_tk: 5381 },
