@@ -11,7 +11,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - name: Verify committed download packages match source
+        run: git diff --exit-code -- packages/
       - uses: actions/upload-artifact@v4
         with:
           name: music-source-plugins
-          path: dist/
+          path: packages/
