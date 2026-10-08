@@ -6,6 +6,7 @@ import type {
   OnlineSong,
   OnlineUrlResult,
 } from '../sdk';
+import { inlineNetEaseCredits } from './lyricCredits';
 
 /**
  * NetEase Cloud Music (网易云音乐) renderer client.
@@ -323,7 +324,8 @@ export class NetEaseMusicAPI implements OnlineMusicProvider {
           })) as NetEaseLyricResponse | undefined;
           lyric = this.extractLyrics(fallbackData);
         }
-        const wordLyrics = data?.yrc?.lyric;
+        const rawWordLyrics = data?.yrc?.lyric;
+        const wordLyrics = rawWordLyrics ? inlineNetEaseCredits(rawWordLyrics, 'yrc') : undefined;
         return lyric || wordLyrics
           ? {
               // The parser prefers wordLyrics. Keeping the raw YRC as a fallback
@@ -346,7 +348,8 @@ export class NetEaseMusicAPI implements OnlineMusicProvider {
       data?.romalrc?.lyric,
     ];
     const lyric = candidates.find((value) => typeof value === 'string' && value.trim().length > 0);
-    return lyric?.trim() || null;
+    // 作词/作曲/制作人 arrive as JSON lines inside the block, not as LRC lines.
+    return lyric ? inlineNetEaseCredits(lyric, 'lrc').trim() || null : null;
   }
 
   async getPlaylists(): Promise<import('../sdk').PlaylistInfo[]> {
