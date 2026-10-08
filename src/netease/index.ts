@@ -2,13 +2,18 @@ import type { MusicPlugin, PluginHost, OnlineMusicElectronAPI } from '../sdk';
 import { configureHost, invoke } from '../runtime';
 import { createContext } from '../shared/context';
 import { NetEaseMusicAPI } from './provider';
-import { registerNetEaseHandlers } from './requests';
+import { refreshNetEaseLogin, registerNetEaseHandlers } from './requests';
+import { createCookieRenewal } from './renewal';
 export function createPlugin(host: PluginHost): MusicPlugin {
   configureHost(host); registerNetEaseHandlers();
+  const renewal = createCookieRenewal(host, refreshNetEaseLogin);
   const bridge: OnlineMusicElectronAPI = {
-    neteaseRequest: (channel, params, cookie) => invoke('netease-request', [channel, params, cookie]) as ReturnType<NonNullable<OnlineMusicElectronAPI['neteaseRequest']>>,
+    // Using the source is what keeps its login alive: once the request settles, extend
+    // the stored session if that has not happened for a day.
+    neteaseRequest: (channel, params, cookie) => (invoke('netease-request', [channel, params, cookie]) as ReturnType<NonNullable<OnlineMusicElectronAPI['neteaseRequest']>>)
+      .finally(() => { renewal.renewIfDue(); }),
   };
-  return { provider: new NetEaseMusicAPI(createContext(host, bridge, async () => false)), invoke,
+  return { provider: new NetEaseMusicAPI(createContext(host, bridge, renewal.renew)), invoke,
     validateCookie: async cookie => {
       const result = await bridge.neteaseRequest!('/nuser/account/get', { csrf_token: '' }, cookie);
       const data = result.data as { code?: number; account?: unknown; profile?: unknown } | undefined;

@@ -82,7 +82,7 @@ interface NetEaseRequestResult {
   error?: string;
 }
 
-interface NetEaseRawResult extends NetEaseRequestResult {
+export interface NetEaseRawResult extends NetEaseRequestResult {
   /** Raw `Set-Cookie` header values (only populated where requested). */
   setCookies?: string[];
 }
@@ -140,6 +140,16 @@ function weapiPost(
   // NetEaseRawResult is a structural superset of NetEaseRequestResult; the
   // extra `setCookies` field is simply ignored by generic callers.
   return weapiRequest(channel, params, cookie);
+}
+
+/**
+ * Ask NetEase to extend the login session behind `cookie`. A live session answers
+ * code 200 and rotates `MUSIC_U` / `__csrf` through Set-Cookie; an expired or
+ * anonymous one answers 301.
+ */
+export function refreshNetEaseLogin(cookie: string): Promise<NetEaseRawResult> {
+  const csrf = /(?:^|;\s*)__csrf=([^;]*)/.exec(cookie)?.[1] ?? '';
+  return weapiRequest('/login/token/refresh', { csrf_token: csrf }, cookie, true);
 }
 
 /** Reduce a list of `Set-Cookie` header values to a `k=v; k=v` string. */

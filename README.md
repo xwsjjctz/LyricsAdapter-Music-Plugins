@@ -19,7 +19,7 @@ npm run check
 插件在宿主的 Node 运行环境中执行，通过 `createPlugin(host)` 接收日志和仅属于该插件的凭据存储能力。插件本身不导入 Electron、React 或 LyricsAdapter 内部代码。
 
 - QQ：搜索、推荐、歌单分页、vkey 与音质回退、扫码登录、musickey 续期、LRC/QRC 获取与解密。
-- 网易云：歌曲与封面补全、歌单分页、weapi 加密、扫码登录、音频 URL 与实际音质、LRC/YRC。
+- 网易云：歌曲与封面补全、歌单分页、weapi 加密、扫码登录、登录续期、音频 URL 与实际音质、LRC/YRC。
 - 宿主：界面、播放器、队列、音乐库、歌词解析和有界缓存、音频传输、文件保存、元数据写入、safeStorage 加密及兼容性检查。
 
 API 版本为 1，当前歌曲字段保留 `songmid` 等旧结构，音乐源标识保留 `qq` 与 `netease`。`src/sdk.ts` 定义插件合同；宿主拒绝不兼容的 `apiVersion`。

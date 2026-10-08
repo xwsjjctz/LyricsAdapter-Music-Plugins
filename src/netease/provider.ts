@@ -106,8 +106,15 @@ export class NetEaseMusicAPI implements OnlineMusicProvider {
     if (!desktopAPI?.neteaseRequest) {
       throw new Error('网易云 API 不可用（需要桌面端运行）');
     }
-    const cookie = this.context.cookie.getCookie();
-    const result = await desktopAPI.neteaseRequest(channel, params, cookie || undefined);
+    const send = () => desktopAPI.neteaseRequest!(channel, params, this.context.cookie.getCookie() || undefined);
+    let result = await send();
+    // 301 = login required. With a stored login that means the session lapsed:
+    // extend it and retry once with the renewed cookie.
+    const loginRequired = result.success && (result.data as { code?: number } | undefined)?.code === 301;
+    if (loginRequired && this.context.cookie.hasCookie() && await this.context.refresh()) {
+      this.context.logger.info('[NetEase] Retrying after login renewal');
+      result = await send();
+    }
     if (!result.success) {
       throw new Error(result.error || `${channel} 失败`);
     }
