@@ -31,6 +31,13 @@ API 版本为 1，当前歌曲字段保留 `songmid` 等旧结构，音乐源标
 
 ## 分发与插件目录
 
+`npm run package` 生成两个目录文件：
+
+- `packages/catalog.json`（`apiVersion: 1`）：只含 QQ 与网易云，供旧版本 LyricsAdapter 读取。旧版本遇到其他 ID 会把整个目录判为无效，所以不要往这里加其他插件。
+- `packages/catalog.v2.json`（`apiVersion: 2`）：每项带 `kind`（`music.source` / `lyrics.translation`），并合并 [external-plugins.json](external-plugins.json) 中在其他仓库发布的官方插件（目前是[大语言模型歌词翻译](https://github.com/xwsjjctz/LyricsAdapter-LLM-Translation)）。支持 v2 的应用优先读取它。
+
+收录或更新外部插件：在 `external-plugins.json` 中填写 `id`、`name`、`kind`、`version`、`url`（`https://github.com/xwsjjctz/<仓库>/releases/download/<tag>/<id>.laplugin`）、`sha256`（Release 中安装包完整字节的 SHA-256）和可选的 `description`，运行 `npm run check` 后提交。格式说明见 LyricsAdapter 的 [docs/music-source-plugins.md](https://github.com/xwsjjctz/LyricsAdapter/blob/dev/docs/music-source-plugins.md#官方目录-v2)。
+
 `packages/` 中的安装包和目录随源码一同提交到 `main`，宿主从 GitHub 原始文件地址读取，无需先创建 Release，也无需用户克隆源码或构建插件。目录记录插件版本和安装包 SHA-256，安装包内部同时记录代码 SHA-256；宿主验证摘要、ID、版本与 API 兼容性后才安装。GitHub Releases 安装包仍可作为兼容分发方式。
 
 修改协议实现或版本后运行 `npm run check`，一同提交源码、安装包和目录。CI 重新生成并比较已提交的分发文件，防止源码与下载包不一致，也会上传安装包为 Actions artifact。插件页可手动刷新目录和下载安装更新；自动更新、第三方市场与运行隔离尚未实现。
