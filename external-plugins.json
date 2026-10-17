@@ -1,0 +1,13 @@
+{
+  "plugins": [
+    {
+      "id": "llm-translation",
+      "name": "大语言模型歌词翻译",
+      "kind": "lyrics.translation",
+      "version": "1.0.0",
+      "url": "https://github.com/xwsjjctz/LyricsAdapter-LLM-Translation/releases/download/v1.0.0/llm-translation.laplugin",
+      "sha256": "b75b8abb8a33669fc16e0b09a121bc63132322b6a0bf162f6889d5f6291d7bb9",
+      "description": "调用 OpenAI 兼容接口或 Claude 翻译歌词，译文按歌曲缓存在本地。需要支持插件核心 API 1.1 的 LyricsAdapter。"
+    }
+  ]
+}
