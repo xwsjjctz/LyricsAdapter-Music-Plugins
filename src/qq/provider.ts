@@ -691,7 +691,11 @@ export class QQMusicAPI implements OnlineMusicProvider {
     }
   }
 
-  /** One page from CgiGetDiss; null when it gave nothing usable before the end. */
+  /**
+   * One page from CgiGetDiss; null when it gave a short page before the end.
+   * CgiGetDiss silently drops some songs from a page, and the host stops paging
+   * at the first short page, so the full list has to fill it instead.
+   */
   private async getPlaylistSongsPage(
     playlistId: string,
     songBegin: number,
@@ -734,9 +738,12 @@ export class QQMusicAPI implements OnlineMusicProvider {
     }
     const pageData = result?.req_0?.code === 0 ? result.req_0.data : undefined;
     const songList: unknown[] = pageData?.songlist ?? [];
-    if (songList.length > 0) return songList.map((song) => this.normalizeSong(song));
     const total = pageData?.total_song_num;
-    return typeof total === 'number' && songBegin >= total ? [] : null;
+    const reachesEnd = typeof total === 'number' && songBegin + songList.length >= total;
+    if (songList.length >= songNum || (songList.length > 0 && reachesEnd)) {
+      return songList.map((song) => this.normalizeSong(song));
+    }
+    return reachesEnd ? [] : null;
   }
 
   /**

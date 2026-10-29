@@ -4,16 +4,16 @@
     {
       "id": "qq",
       "name": "QQ 音乐",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "file": "qq.laplugin",
-      "sha256": "9904f2d6e5bba22e61151bcf370475799904eba908a6072cfccbc97b707aad2a"
+      "sha256": "f565af911a1fc4b701468702b79c4beb6e041db9bd49bbfe7c612e3da6ad9268"
     },
     {
       "id": "netease",
       "name": "网易云音乐",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "file": "netease.laplugin",
-      "sha256": "f0cea7fb04306e696dedd6ea406486ec0ee65448e6b22b45e49d60d757c451b8"
+      "sha256": "80f8c0aea913d396560508132f201d832f74d4c1e95cf253ff82b4119052fa40"
     }
   ]
 }
