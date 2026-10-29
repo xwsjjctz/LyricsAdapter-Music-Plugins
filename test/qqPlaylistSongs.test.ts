@@ -9,7 +9,9 @@ const qzoneSongs = Array.from({ length: TOTAL }, (_, i) => ({
 }));
 const musicuSong = (i: number) => ({ mid: `mid${i}`, name: `Song ${i}`, singer: [{ name: 'A' }], album: { mid: `alb${i}` }, interval: 200 });
 
-type Mode = 'paged' | 'paged-empty' | 'paged-fails';
+type Mode = 'paged' | 'paged-empty' | 'paged-fails' | 'paged-drops';
+// CgiGetDiss leaves this song out of its page (seen on delisted songs).
+const DROPPED = 45;
 
 async function freshApi(mode: Mode = 'paged') {
   vi.resetModules();
@@ -20,7 +22,8 @@ async function freshApi(mode: Mode = 'paged') {
     const { disstid, song_begin: begin, song_num: num } = JSON.parse(options.body!).req_0.param;
     // CgiGetDiss rejects a string id with req_0.code 10004.
     if (typeof disstid !== 'number') return { code: 0, req_0: { code: 10004, data: { songlist: [], total_song_num: 0 } } };
-    const songlist = mode === 'paged-empty' ? [] : Array.from({ length: Math.max(0, Math.min(num, TOTAL - begin)) }, (_, i) => musicuSong(begin + i));
+    const songlist = mode === 'paged-empty' ? [] : Array.from({ length: Math.max(0, Math.min(num, TOTAL - begin)) }, (_, i) => musicuSong(begin + i))
+      .filter(song => mode !== 'paged-drops' || song.mid !== `mid${DROPPED}`);
     return { code: 0, req_0: { code: 0, data: { songlist, total_song_num: TOTAL } } };
   });
   (qqMusicApi as unknown as { requestJson: typeof requestJson }).requestJson = requestJson;
@@ -54,6 +57,15 @@ describe('QQ playlist songs', () => {
   it('falls back when the paged endpoint returns nothing before the end', async () => {
     const { api, fullListCalls } = await freshApi('paged-empty');
     expect(await api.getPlaylistSongs('p1', 0, 30)).toHaveLength(30);
+    expect(fullListCalls()).toBe(1);
+  });
+
+  it('fills a short page from the full list so paging does not stop early', async () => {
+    const { api, fullListCalls } = await freshApi('paged-drops');
+    expect(await api.getPlaylistSongs('3349641645', 0, 30)).toHaveLength(30);
+    const second = await api.getPlaylistSongs('3349641645', 30, 30);
+    expect(second.map(s => s.songmid)).toEqual(qzoneSongs.slice(30, 60).map(s => s.songmid));
+    expect(await api.getPlaylistSongs('3349641645', 60, 30)).toHaveLength(5);
     expect(fullListCalls()).toBe(1);
   });
 
