@@ -1,5 +1,7 @@
 name: Music plugins
 on: [push, pull_request]
+permissions:
+  contents: read
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -17,3 +19,29 @@ jobs:
         with:
           name: music-source-plugins
           path: packages/
+  # Each new package.json version merged into main becomes a v<version> Release
+  # carrying the same packages the catalog serves; an existing tag is left alone.
+  release:
+    needs: check
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: release
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish the packaged version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "$tag is already released; skipping."
+            exit 0
+          fi
+          prerelease=()
+          [[ "$tag" == *-* ]] && prerelease=(--prerelease)
+          gh release create "$tag" packages/qq.laplugin packages/netease.laplugin \
+            --target "$GITHUB_SHA" --title "$tag" --generate-notes "${prerelease[@]}"

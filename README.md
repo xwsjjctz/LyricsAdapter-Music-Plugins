@@ -38,7 +38,9 @@ API 版本为 1，当前歌曲字段保留 `songmid` 等旧结构，音乐源标
 
 收录或更新外部插件：在 `external-plugins.json` 中填写 `id`、`name`、`kind`、`version`、`url`（`https://github.com/xwsjjctz/<仓库>/releases/download/<tag>/<id>.laplugin`）、`sha256`（Release 中安装包完整字节的 SHA-256）和可选的 `description`，运行 `npm run check` 后提交。格式说明见 LyricsAdapter 的 [docs/music-source-plugins.md](https://github.com/xwsjjctz/LyricsAdapter/blob/dev/docs/music-source-plugins.md#官方目录-v2)。
 
-`packages/` 中的安装包和目录随源码一同提交到 `main`，宿主从 GitHub 原始文件地址读取，无需先创建 Release，也无需用户克隆源码或构建插件。目录记录插件版本和安装包 SHA-256，安装包内部同时记录代码 SHA-256；宿主验证摘要、ID、版本与 API 兼容性后才安装。GitHub Releases 安装包仍可作为兼容分发方式。
+`packages/` 中的安装包和目录随源码一同提交到 `main`，宿主从 GitHub 原始文件地址读取，无需先创建 Release，也无需用户克隆源码或构建插件。目录记录插件版本和安装包 SHA-256，安装包内部同时记录代码 SHA-256；宿主验证摘要、ID、版本与 API 兼容性后才安装。GitHub Releases 安装包仍可作为兼容分发方式：新版本合并到 `main` 后，CI 自动创建 `v<version>` Release 并附上 `qq.laplugin` 与 `netease.laplugin`，已存在的版本不会被覆盖。
+
+发布新版本：在 `dev` 上用 `npm version <x.y.z> --no-git-tag-version` 升级版本号，运行 `npm run check` 并提交，再开 `dev` → `main` 的 PR 合并。
 
 修改协议实现或版本后运行 `npm run check`，一同提交源码、安装包和目录。CI 重新生成并比较已提交的分发文件，防止源码与下载包不一致，也会上传安装包为 Actions artifact。插件页可手动刷新目录和下载安装更新；自动更新、第三方市场与运行隔离尚未实现。
 
